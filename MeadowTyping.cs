@@ -96,9 +96,12 @@ public partial class MeadowTyping : BaseUnityPlugin
             if (len > 0)
             {
                 checkkeys = true;
+		// special backspace stuff here instead of CaptureInputs, because ctrl + backspace doesn't always emit a capturable character on some operating systems
+  
                 if (Input.GetKey(KeyCode.Backspace) && chatcursor > 0)
                 {
-                    if (backspaceheld == 0 || (backspaceheld > 30 && (backspaceheld % 2 == 0)))
+		    // activates on either the first frame the key is held, or every other frame after it's been held down for 500ms
+                    if (backspaceheld == 0 || (backspaceheld >= 30 && (backspaceheld % 2 == 0)))
                     {
                         if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt))
                         {
@@ -106,6 +109,7 @@ public partial class MeadowTyping : BaseUnityPlugin
                             chat.menuLabel.text = ChatTextBox.lastSentMessage;
                             chatcursor = 0;
                         }
+			// might want to move alt + backspace to CaptureInputs, and change backspaceheld to only increment when both ctrl and backspace are held
                         if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
                         {
                             //.LogInfo("CTRL + Backspace captured!");
@@ -114,16 +118,7 @@ public partial class MeadowTyping : BaseUnityPlugin
                                 self.menu.PlaySound(SoundID.MENY_Already_Selected_MultipleChoice_Clicked);
                                 //Logger.LogInfo("Got past the length check Message: " + msg);
                                 int pos = (chatcursor > 0) ? chatcursor - 1 : 0;
-                                int /*space = 0;
-                if (validchars.Contains(msg[pos])) for (int i = pos; chatcursor < i; i--)
-                    {
-                        if(!validchars.Contains(msg[i]))
-                        {
-                            space = msg.Substring(0, i).LastIndexOfAny(validchars) + 1;
-                            break;
-                        }
-                    }
-                else*/ space = msg.Substring(0, pos).LastIndexOf(' ') + 1;
+                                int space = msg.Substring(0, pos).LastIndexOf(' ') + 1;
                                 //Logger.LogInfo("Space index is " + space);
                                 ChatTextBox.lastSentMessage = msg.Remove(space, chatcursor - space);
                                 chat.menuLabel.text = ChatTextBox.lastSentMessage;
@@ -139,7 +134,7 @@ public partial class MeadowTyping : BaseUnityPlugin
                     backspaceheld = 0;
                     if (Input.GetKey(KeyCode.LeftArrow) && chatcursor > 0)
                     {
-                        if (arrowheld == 0 || (arrowheld > 30 && (arrowheld % 2 == 0)))
+                        if (arrowheld == 0 || (arrowheld >= 30 && (arrowheld % 2 == 0)))
                         {
                             if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
                             {
@@ -154,6 +149,8 @@ public partial class MeadowTyping : BaseUnityPlugin
                             {
                                 //Logger.LogInfo((self as ChatTemplate)._cursor.height);
                                 //Logger.LogInfo((self as ChatTemplate)._cursor.width);
+				// sets cursor sprite to a one pixel wide vertical line
+    				// thanks to SlimeCubed's Dev Console
                                 (self as ChatTemplate)._cursor.element = Futile.atlasManager.GetElementWithName("pixel");
                                 (self as ChatTemplate)._cursor.height = 13f;
                                 float width = LabelTest.GetWidth((self as ChatTemplate).menuLabel.label.text.Substring(0, chatcursor), false);
@@ -164,9 +161,10 @@ public partial class MeadowTyping : BaseUnityPlugin
                         arrowheld++;
                         //instance.Logger.LogInfo(chatcursor);
                     }
+		    // might want to separate tracking of left and right arrows? also might not matter
                     else if (Input.GetKey(KeyCode.RightArrow) && chatcursor < len)
                     {
-                        if (arrowheld == 0 || (arrowheld > 30 && (arrowheld % 2 == 0)))
+                        if (arrowheld == 0 || (arrowheld >= 30 && (arrowheld % 2 == 0)))
                         {
                             if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
                             {
@@ -182,6 +180,7 @@ public partial class MeadowTyping : BaseUnityPlugin
                             else chatcursor++;
                             if (chatcursor == len)
                             {
+			    // resets cursor sprite
                                 (self as ChatTemplate)._cursor.element = Futile.atlasManager.GetElementWithName("modInputCursor");
                                 (self as ChatTemplate)._cursor.height = 6f;
                                 float width = LabelTest.GetWidth((self as ChatTemplate).menuLabel.label.text, false);
@@ -200,6 +199,7 @@ public partial class MeadowTyping : BaseUnityPlugin
         orig(self, timeStacker);
     }
 
+    // could not for the life of me get the OnShutDownRequest action to be invoked through reflection, so i just nabbed the code and put it in my own method
     private static void DestroyChatTextBox()
     {
         ChatTextBox.lastSentMessage = "";
@@ -217,15 +217,8 @@ public partial class MeadowTyping : BaseUnityPlugin
         }
         OpenChat = null;
     }
-
-    /*private static float SlightlyLeft(float width, ChatTemplate self)
-    {
-        if (!(self is ChatTextBox) || self.menuLabel.text == null || self.menuLabel.text.Length < 1 || chatcursor < 1) return false;
-        string str = self.menuLabel.text.Substring(0, chatcursor);
-        self._cursorWidth = LabelTest.GetWidth(str, false);
-        self.cursorWrap.sprite.x = self._cursorWidth + 18f;
-        return true;
-    }*/
+    
+    // changes the string to be everything before the chat cursor
     private static string MoveCursorDisplay(string text, ChatTemplate self)
     {
         if (!(self is ChatTextBox) || text.Length < 1) return text;
@@ -233,13 +226,18 @@ public partial class MeadowTyping : BaseUnityPlugin
         return text.Substring(0, chatcursor);
 
     }
+    
+    // moves the cursor a little bit left so as to properly fit where it's supposed to be
     private static float SlightlyLeft(float width, ChatTemplate self)
     {
         if (!(self is ChatTextBox)) return width;
         int len = self.menuLabel.label.text.Length;
+	// for whatever reason self.pos.x getting added messes up the cursor's position in-game, so it gets removed
+ 	// self.pos.x is apparently also off by 4f when in the story lobby menu
         return width - ((len > 0 && chatcursor < len) ? 8f : 1f) - (self.menu is StoryOnlineMenu ? 4f : self.pos.x);
     }
 
+	// modifies where the cursor's x position is set
     private static void IL_ChatTemplate_Update(ILContext il)
     {
         ILCursor c = new ILCursor(il);
@@ -250,6 +248,7 @@ public partial class MeadowTyping : BaseUnityPlugin
             x => x.MatchCallOrCallvirt<FLabel>("get_text")
         ))
         {
+	    // emits after the string parameter in LabelTest.GetWidth
             c.Emit(OpCodes.Ldarg_0);
             c.EmitDelegate(MoveCursorDisplay);
             if (c.TryGotoNext(
@@ -258,6 +257,7 @@ public partial class MeadowTyping : BaseUnityPlugin
                 x => x.MatchAdd()
             ))
             {
+	    	// emits right before cursorWrap.sprite.x is set
                 c.Emit(OpCodes.Ldarg_0);
                 c.EmitDelegate(SlightlyLeft);
             }
@@ -266,18 +266,14 @@ public partial class MeadowTyping : BaseUnityPlugin
         //else Logger.LogError("Failed to load ChatTemplate IL hook!");
     }
 
-    /*private bool On_ChatTextBox_GetKeyDown(Func<Func<KeyCode, bool>, KeyCode, bool> orig, Func<KeyCode, bool> self, KeyCode code)
-    {
-        if (code == KeyCode.LeftArrow || code == KeyCode.RightArrow) return self(code);
-        return orig(self, code);
-    }*/
-
+    // returns original value if keys are being checked for chat inputs
     private static bool On_ChatTextBox_GetKey(Func<Func<KeyCode, bool>, KeyCode, bool> orig, Func<KeyCode, bool> self, KeyCode code)
     {
         if (checkkeys /*|| code == KeyCode.LeftControl || code == KeyCode.LeftAlt || code == KeyCode.LeftArrow || code == KeyCode.RightArrow || code == KeyCode.RightControl || code == KeyCode.RightAlt || code == KeyCode.Backspace*/) return self(code);
         return orig(self, code);
     }
 
+    // marks the currently active chat hud
     private static void On_ChatHud_ctor(Action<ChatHud, HUD.HUD, RoomCamera> orig, ChatHud self, HUD.HUD hud, RoomCamera camera)
     {
         //Logger.LogInfo("Hud constructed!");
@@ -285,6 +281,7 @@ public partial class MeadowTyping : BaseUnityPlugin
         orig(self, hud, camera);
     }
 
+    // marks the currently active chat text box, and resets the cursor
     private static void On_TextBox_ctor(Action<ChatTextBox, Menu.Menu, MenuObject, string, Vector2, Vector2> orig, ChatTextBox self, Menu.Menu menu, MenuObject owner, string displayText, Vector2 pos, Vector2 size)
     {
         //Logger.LogInfo("Text box constructed!");
@@ -296,33 +293,11 @@ public partial class MeadowTyping : BaseUnityPlugin
 	private static void On_TextBox_CaptureInputs(Action<ChatTextBox, char> orig, ChatTextBox self, char input)
 	{
         //Logger.LogInfo("Input captured: " + input + " " + input.ToString());
+	// the "Delete" character,
         if (input == '\u007F') return;
         string msg = ChatTextBox.lastSentMessage;
         checkkeys = true;
-        /*if (input == '\u007F' || ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && input == '\b'))
-        {
-            //.LogInfo("CTRL + Backspace captured!");
-            if (chatcursor > 0) {
-                self.menu.PlaySound(SoundID.MENY_Already_Selected_MultipleChoice_Clicked);
-                //Logger.LogInfo("Got past the length check Message: " + msg);
-                int pos = (chatcursor > 0) ? chatcursor - 1: 0;
-                int /*space = 0;
-                if (validchars.Contains(msg[pos])) for (int i = pos; chatcursor < i; i--)
-                    {
-                        if(!validchars.Contains(msg[i]))
-                        {
-                            space = msg.Substring(0, i).LastIndexOfAny(validchars) + 1;
-                            break;
-                        }
-                    }
-                else space = msg.Substring(0, pos).LastIndexOf(' ') + 1;
-                //Logger.LogInfo("Space index is " + space);
-                ChatTextBox.lastSentMessage = msg.Remove(space, chatcursor - space);
-                if (space > msg.Length) space = msg.Length;
-                chatcursor = space;
-            }
-        }
-        else*/ if (input == '\b' || input == '\u0008' && !(Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)))
+	if (input == '\b' || input == '\u0008' && !(Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)))
         {
             if (chatcursor > 0)
             {
@@ -331,24 +306,12 @@ public partial class MeadowTyping : BaseUnityPlugin
                 chatcursor--;
             }
         }
-        /*else if (input == char)
-        {
-            if (msg.Length > 0 && !string.IsNullOrWhiteSpace(msg))
-            {
-                MatchmakingManager.currentInstance.SendChatMessage(msg);
-                foreach (var player in OnlineManager.players)
-                {
-                    player.InvokeRPC(RPCs.UpdateUsernameTemporarily, msg);
-                }
-            }
-            else
-            {
-                self.menu.PlaySound(SoundID.MENY_Already_Selected_MultipleChoice_Clicked);
-                RainMeadow.RainMeadow.Debug("Could not send lastSentMessage because it had no text or only had whitespaces");
-            }
-          (typeof(ChatTextBox).GetField("OnShutDownRequest", BindingFlags.Public | BindingFlags.Static).GetValue(null) as Action).Invoke();
-            (typeof(ChatTextBox).GetField("typingHandler", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(self) as ButtonTypingHandler).Unassign(self);
-        }*/
+	// i decided against implementing the ability to paste, mainly out of concern for spam. it's still possible,
+ 	// just by spamming single characters, but at the very least it can't be done with entire messages.
+  	// i know pasting can be useful, but i also view the relative simplicity of the chat as a part of its charm.
+   	// ironic since i made this mod, but things like ctrl + backspace are universally way too useful to brush off
+    	// with something like "it would go against the chat's simple charm"
+ 
         /*else if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && input == 'v')
         {
             self.menu.PlaySound(SoundID.MENU_Checkbox_Check);
@@ -370,6 +333,7 @@ public partial class MeadowTyping : BaseUnityPlugin
                 self.menu.PlaySound(SoundID.MENY_Already_Selected_MultipleChoice_Clicked);
                 RainMeadow.RainMeadow.Debug("Could not send lastSentMessage because it had no text or only had whitespaces");
             }
+	    // only resets the chat text box if in a story lobby menu, otherwise the text box is just destroyed
             if (self.menu != null && self.menu is StoryOnlineMenu)
             {
                 ChatTextBox.lastSentMessage = "";
@@ -410,6 +374,7 @@ public partial class MeadowTyping : BaseUnityPlugin
         return false;
     }
 
+    // checks if the chat bar is open when the pause button is pressed, and closes it instead of pausing the game
     private static void IL_RainWorldGame_Update(ILContext il)
     {
         ILCursor c = new(il);
@@ -418,51 +383,16 @@ public partial class MeadowTyping : BaseUnityPlugin
             MoveType.After,
             x => x.MatchCallOrCallvirt<RoomCamera>("get_roomSafeForPause"),
             x => x.MatchBrfalse(out skip)
-            /* x => x.MatchLdarg(0),
-            x => x.MatchLdarg(0),
-            x => x.MatchLdfld(out var _),
-            x => x.MatchLdarg(0),
-            x => x.MatchNewobj(out var _),
-            x => x.MatchStfld<RainWorldGame>("pauseMenu")*/
             ))
         {
             //c.Index++;
             c.MoveAfterLabels();
+	    // emits after the final check to see if the game should be paused
             c.EmitDelegate(IsChatOpen);
             c.Emit(OpCodes.Brtrue_S, skip);
         }
         //else Logger.LogError("Failed to load RainWorldGame IL hook!");
     }
-
-    /*private static bool CheckPauseStory(bool pause, SlugcatSelectMenu self)
-    {
-        //instance.Logger.LogInfo("IS CHAT OPEN CALLED " + typeof(ChatTextBox).GetField("blockInput", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null));
-        if (pause && !self.lastPauseButton && OpenChat != null && (bool)blockinput.GetValue(null))
-        {
-            OpenChat.menu.PlaySound(SoundID.MENY_Already_Selected_MultipleChoice_Clicked);
-            //ActiveChat.ShutDownChatInput();
-            if (!ChatHud.isLogToggled) ActiveChat.ShutDownChatLog();
-            DestroyChatTextBox();
-            //(typinghandler.GetValue(OpenChat) as ButtonTypingHandler).Unassign(OpenChat);
-            return true;
-        }
-        return pause;
-    }
-
-    private static bool CheckPauseArena(bool pause, MultiplayerMenu self)
-    {
-        //instance.Logger.LogInfo("IS CHAT OPEN CALLED " + typeof(ChatTextBox).GetField("blockInput", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null));
-        if (pause && !self.lastPauseButton && OpenChat != null && (bool)blockinput.GetValue(null))
-        {
-            OpenChat.menu.PlaySound(SoundID.MENY_Already_Selected_MultipleChoice_Clicked);
-            //ActiveChat.ShutDownChatInput();
-            if (!ChatHud.isLogToggled) ActiveChat.ShutDownChatLog();
-            DestroyChatTextBox();
-            //(typinghandler.GetValue(OpenChat) as ButtonTypingHandler).Unassign(OpenChat);
-            return true;
-        }
-        return pause;
-    }*/
 
     private static bool ChatEscape(Menu.Menu self)
     {
@@ -482,6 +412,7 @@ public partial class MeadowTyping : BaseUnityPlugin
         return false;
     }
 
+    // if the chat bar is open, it's closed instead of exiting the menu
     private static void IL_StoryArenaMenu_Update(ILContext il)
     {
         ILCursor c = new ILCursor(il);
@@ -502,6 +433,7 @@ public partial class MeadowTyping : BaseUnityPlugin
         }
     }
 
+    // disables moving around in the menu if chat is open and blocking inputs
     private static void On_Menu_SelectNewObject(On.Menu.Menu.orig_SelectNewObject orig, Menu.Menu self, RWCustom.IntVector2 direction)
     {
         if ((bool)blockinput.GetValue(null)) return;
