@@ -1,0 +1,11 @@
+{
+    "id": "meadowtyping",
+    "name": "Better Meadow Typing",
+    "version": "1.2.0",
+    "authors": "yuzugamer",
+    "description": "Allows use of CTRL + Backspace, as well as Escape closing the chat bar without pausing the game",
+	"requirements": ["henpemaz_rainmeadow"],
+    "requirements_names": ["Rain Meadow"],
+    "checksum_override_version": true,
+	"tags": ["Accessibility", "Base", "Downpour", "Watcher"]
+}
